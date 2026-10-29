@@ -1,0 +1,21 @@
+services:
+  backend:
+    build: ./backend
+    ports: ["127.0.0.1:8000:8000"]   # accessible depuis ce poste uniquement
+    volumes:
+      - ./config:/config:ro          # scoring.yaml modifiable sans rebuild (redémarrer le service)
+      - cache:/data                  # cache SQLite (géométries 30 j, météo 3 h)
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')"]
+      interval: 10s
+      retries: 5
+
+  frontend:
+    build: ./frontend
+    ports: ["127.0.0.1:5173:5173"]
+    environment:
+      API_TARGET: http://backend:8000
+    depends_on: [backend]
+
+volumes:
+  cache:

@@ -1,0 +1,25 @@
+# Environnements et dépendances
+backend/.venv/
+frontend/node_modules/
+__pycache__/
+.pytest_cache/
+
+# Artefacts et cache (≈ 200 Mo de géométries IGN)
+backend/data/
+*.sqlite
+*.sqlite-*
+frontend/dist/
+
+# Secrets éventuels : ne jamais versionner
+.env
+.env.*
+*.pem
+*.key
+
+# Divers
+*.log
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+.claude/

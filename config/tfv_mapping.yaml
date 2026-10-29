@@ -1,0 +1,36 @@
+# Correspondance code TFV (BD Forêt V2, champ code_tfv) -> catégorie d'essence de scoring.yaml
+# Les 32 codes ont été relevés sur la couche LANDCOVER.FORESTINVENTORY.V2:formation_vegetale
+# (voir docs/DATA_SOURCES.md). Un code absent d'ici est classé "sans_couvert".
+
+FF1G01-01: { category: chene,                  label: "Forêt fermée de chênes décidus purs" }
+FF1G06-06: { category: chene_vert,             label: "Forêt fermée de chênes sempervirents purs" }
+FF1-09-09: { category: hetre,                  label: "Forêt fermée de hêtre pur" }
+FF1-10-10: { category: chataignier,            label: "Forêt fermée de châtaignier pur" }
+FF1-14-14: { category: robinier,               label: "Forêt fermée de robinier pur" }
+FF1-49-49: { category: feuillus_autres,        label: "Forêt fermée d'un autre feuillu pur" }
+FF1-00-00: { category: melange_feuillus,       label: "Forêt fermée à mélange de feuillus" }
+FF1-00:    { category: feuillus_indetermines,  label: "Forêt fermée de feuillus purs en îlots" }
+FF2G61-61: { category: sapin_epicea,           label: "Forêt fermée de sapin ou épicéa" }
+FF2-51-51: { category: pin,                    label: "Forêt fermée de pin maritime pur" }
+FF2-52-52: { category: pin,                    label: "Forêt fermée de pin sylvestre pur" }
+FF2G53-53: { category: pin,                    label: "Forêt fermée de pin laricio ou pin noir pur" }
+FF2-57-57: { category: pin_alep,               label: "Forêt fermée de pin d'Alep pur" }
+FF2G58-58: { category: pin,                    label: "Forêt fermée de pin à crochets ou pin cembro pur" }
+FF2-80-80: { category: pin,                    label: "Forêt fermée à mélange de pins purs" }
+FF2-81-81: { category: pin,                    label: "Forêt fermée d'un autre pin pur" }
+FF2-63-63: { category: meleze,                 label: "Forêt fermée de mélèze pur" }
+FF2-64-64: { category: douglas,                label: "Forêt fermée de douglas pur" }
+FF2-90-90: { category: coniferes_indetermines, label: "Forêt fermée à mélange d'autres conifères" }
+FF2-91-91: { category: coniferes_indetermines, label: "Forêt fermée d'un autre conifère pur autre que pin" }
+FF2-00-00: { category: coniferes_indetermines, label: "Forêt fermée à mélange de conifères" }
+FF2-00:    { category: coniferes_indetermines, label: "Forêt fermée de conifères purs en îlots" }
+FF31:      { category: mixte,                  label: "Forêt fermée à mélange de feuillus prépondérants et conifères" }
+FF32:      { category: mixte,                  label: "Forêt fermée à mélange de conifères prépondérants et feuillus" }
+FF0:       { category: sans_couvert,           label: "Forêt fermée sans couvert arboré" }
+FO1:       { category: foret_ouverte,          label: "Forêt ouverte de feuillus purs" }
+FO2:       { category: foret_ouverte,          label: "Forêt ouverte de conifères purs" }
+FO3:       { category: foret_ouverte,          label: "Forêt ouverte à mélange de feuillus et conifères" }
+FO0:       { category: sans_couvert,           label: "Forêt ouverte sans couvert arboré" }
+FP:        { category: peupleraie,             label: "Peupleraie" }
+LA4:       { category: lande,                  label: "Lande" }
+LA6:       { category: lande,                  label: "Formation herbacée" }

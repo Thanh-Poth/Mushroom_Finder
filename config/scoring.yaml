@@ -1,0 +1,93 @@
+# Modèle de score « Cèpes France »
+# score = 100 × score_essence × score_météo
+# Tous les seuils sont modifiables ici sans toucher au code (redémarrer le backend).
+#
+# Les courbes "points" sont des interpolations linéaires [[x, valeur], ...] :
+# en dessous du premier x on garde la première valeur, au-dessus du dernier la dernière.
+
+# ---------------------------------------------------------------------------
+# 1. Essences (symbiose mycorhizienne avec Boletus edulis / aereus / pinophilus / reticulatus)
+#    Le rattachement code TFV -> catégorie est dans tfv_mapping.yaml.
+#    group = regroupement utilisé par le filtre de l'interface.
+# ---------------------------------------------------------------------------
+essences:
+  chene:                  { label: "Chênes",                 score: 1.00, group: "Chênes" }
+  chene_vert:             { label: "Chênes verts / lièges",  score: 0.60, group: "Chênes" }
+  hetre:                  { label: "Hêtre",                  score: 1.00, group: "Hêtre" }
+  chataignier:            { label: "Châtaignier",            score: 1.00, group: "Châtaignier" }
+  sapin_epicea:           { label: "Sapin, épicéa",          score: 0.90, group: "Sapin / épicéa" }
+  pin:                    { label: "Pins",                   score: 0.85, group: "Pins" }
+  pin_alep:               { label: "Pin d'Alep",             score: 0.25, group: "Pins" }
+  mixte:                  { label: "Mélange feuillus-conifères", score: 0.75, group: "Mélanges" }
+  melange_feuillus:       { label: "Mélange de feuillus",    score: 0.70, group: "Mélanges" }
+  feuillus_indetermines:  { label: "Feuillus (îlots)",       score: 0.55, group: "Mélanges" }
+  coniferes_indetermines: { label: "Conifères divers",       score: 0.40, group: "Mélanges" }
+  foret_ouverte:          { label: "Forêt ouverte",          score: 0.45, group: "Mélanges" }
+  feuillus_autres:        { label: "Autre feuillu",          score: 0.30, group: "Autres" }
+  meleze:                 { label: "Mélèze",                 score: 0.30, group: "Autres" }
+  douglas:                { label: "Douglas (exotique)",     score: 0.15, group: "Autres" }
+  robinier:               { label: "Robinier",               score: 0.00, group: "Autres" }
+  peupleraie:             { label: "Peupleraie",             score: 0.00, group: "Autres" }
+  sans_couvert:           { label: "Sans couvert arboré",    score: 0.05, group: "Autres" }
+  lande:                  { label: "Lande / herbacée",       score: 0.00, group: "Autres" }
+
+# Seuil au-dessus duquel l'essence est affichée « ✓ »
+essence_ok_threshold: 0.6
+
+# ---------------------------------------------------------------------------
+# 2. Météo
+#    Fenêtre principale : les 7 derniers jours complets (J-7 … J-1).
+#    Fenêtre « pluie ancienne » : J-12 … J-8 (pousse décalée de 7 à 12 jours).
+# ---------------------------------------------------------------------------
+weather:
+  main_window_days: 7
+  lag_window: { from_day: 12, to_day: 8 }   # J-12 à J-8 inclus
+
+  # Cumul de pluie sur 7 jours (mm) -> facteur 0..1
+  rain_7d:
+    points: [[0, 0.05], [10, 0.25], [20, 1.0], [60, 1.0], [100, 0.55], [150, 0.25]]
+    ok_range: [20, 60]
+
+  # Température moyenne 7 j (°C) : sol 0-7 cm si dispo, sinon air à 2 m -> facteur 0..1
+  temperature:
+    prefer: soil            # soil | air
+    points: [[0, 0.0], [5, 0.15], [10, 1.0], [18, 1.0], [22, 0.4], [28, 0.05]]
+    ok_range: [10, 18]
+
+  # Gel : température minimale de l'air sur 7 j -> multiplicateur
+  frost:
+    points: [[-5, 0.1], [-2, 0.25], [0, 0.45], [0.5, 1.0]]
+
+  # Humidité du sol moyenne 7 j (m³/m³, 0-7 cm) -> multiplicateur (bonus si humide)
+  soil_moisture:
+    points: [[0.10, 0.8], [0.20, 1.0], [0.30, 1.15], [0.40, 1.2]]
+    ok_min: 0.25
+
+  # Pluie ancienne (J-12…J-8) suivie de temps doux -> bonus
+  lagged_rain:
+    min_rain_mm: 20
+    mild_temp_range: [10, 18]  # température moyenne 7 j (= plage optimale)
+    bonus: 1.2
+
+  # Saison : multiplicateur par mois (1 = janvier)
+  season:
+    1: 0.10
+    2: 0.10
+    3: 0.15
+    4: 0.30
+    5: 0.50
+    6: 0.60
+    7: 0.60
+    8: 0.70
+    9: 1.00
+    10: 1.00
+    11: 0.90
+    12: 0.30
+  season_ok_months: [9, 10, 11]
+
+# Bornes d'affichage de la légende (score 0..100)
+classes:
+  - { min: 60, label: "Très probable", color: "#1a9850" }
+  - { min: 40, label: "Probable",      color: "#91cf60" }
+  - { min: 20, label: "Possible",      color: "#fdae61" }
+  - { min: 0,  label: "Peu probable",  color: "#9e9e9e" }
