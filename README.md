@@ -1,5 +1,7 @@
 # 🍄 Cèpes France
 
+**Français** · [English](README.en.md)
+
 Carte interactive qui estime, pour chaque zone des **forêts publiques** de France métropolitaine,
 la probabilité de trouver des cèpes (*Boletus edulis, aereus, pinophilus, reticulatus*) en croisant :
 
@@ -121,6 +123,7 @@ cd backend
 - **Score** : été sec, automne doux et humide, gel, sol détrempé, peupleraie, absence de température du sol.
 - **Mapping** : les 32 codes TFV sont reconnus.
 - **Résilience** : panne WFS avec et sans cache, panne de l'API météo.
+- **Sécurité** : requêtes inter-sites et hôtes inconnus refusés, absence d'en-tête CORS, paramètres bornés.
 
 ## Sources et licences
 
