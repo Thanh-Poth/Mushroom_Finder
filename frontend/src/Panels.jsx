@@ -5,6 +5,8 @@ import { NO_DATA_COLOR } from './MapView.jsx'
 
 const MARK = { ok: '✓', warn: '⚠', bad: '✗', na: '' }
 const TYPE_LABEL = { domaniale: 'Domaniale', communale: 'Communale', autre: 'Autre forêt publique' }
+const MONTHS = ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.']
+const DANGER_LABEL = { mortel: 'Mortel', toxique: 'Toxique', faible: 'À vérifier' }
 
 export function scoreClass(score, classes) {
   if (score == null) return { label: 'Météo indisponible', color: NO_DATA_COLOR }
@@ -17,6 +19,34 @@ export function ScoreBadge({ score, classes, large }) {
     <span className={large ? 'badge badge-lg' : 'badge'} style={{ background: c.color }} title={c.label}>
       {score ?? '–'}
     </span>
+  )
+}
+
+const seasonText = (months) =>
+  months?.length ? `${MONTHS[months[0] - 1]} – ${MONTHS[months.at(-1) - 1]}` : ''
+
+export function SpeciesPicker({ list, value, onChange }) {
+  if (!list.length) return null
+  return (
+    <section>
+      <h3>Champignon recherché</h3>
+      <div className="species">
+        {list.map((s) => (
+          <button key={s.id} className={value === s.id ? 'sp on' : 'sp'} onClick={() => onChange(s.id)}
+                  aria-pressed={value === s.id} title={s.latin}>
+            <i className="dot" style={{ background: s.color }} />
+            <span className="sp-txt"><strong>{s.label}</strong>
+              <span className="muted">{seasonText(s.season_ok_months)}</span></span>
+          </button>
+        ))}
+        <button className={value === 'best' ? 'sp sp-all on' : 'sp sp-all'} onClick={() => onChange('best')}
+                aria-pressed={value === 'best'}>
+          <i className="dot dot-all" />
+          <span className="sp-txt"><strong>Toutes les espèces</strong>
+            <span className="muted">la plus probable par zone</span></span>
+        </button>
+      </div>
+    </section>
   )
 }
 
@@ -92,10 +122,10 @@ export function Filters({ groups, filters, setFilters }) {
   )
 }
 
-export function Legend({ classes }) {
+export function Legend({ classes, title }) {
   return (
     <section>
-      <h3>Légende</h3>
+      <h3>Légende : {title}</h3>
       <ul className="legend">
         {classes.map((c) => (
           <li key={c.label}><span className="sw" style={{ background: c.color }} />{c.label} ({c.min}+)</li>
@@ -107,7 +137,8 @@ export function Legend({ classes }) {
   )
 }
 
-export function TopPanel({ state, radius, setRadius, onRun, onPick, classes }) {
+export function TopPanel({ state, radius, setRadius, onRun, onPick, classes, species, speciesList }) {
+  const label = (id) => speciesList.find((s) => s.id === id)?.label ?? id
   return (
     <section>
       <h3>Top 10 autour de moi</h3>
@@ -129,7 +160,10 @@ export function TopPanel({ state, radius, setRadius, onRun, onPick, classes }) {
                 <ScoreBadge score={r.score} classes={classes} />
                 <span className="top-txt">
                   <strong>{r.forest_name}</strong>
-                  <span className="muted">{r.essence_label} · {r.area_ha} ha · {r.distance_km} km</span>
+                  <span className="muted">
+                    {species === 'best' ? `${label(r.species)} · ` : ''}
+                    {r.essence_label} · {r.area_ha} ha · {r.distance_km} km
+                  </span>
                 </span>
               </button>
             </li>
@@ -140,40 +174,85 @@ export function TopPanel({ state, radius, setRadius, onRun, onPick, classes }) {
   )
 }
 
-export function DetailsPanel({ selected, classes, essenceOk, onClose }) {
+function Lookalikes({ sp }) {
+  if (!sp?.lookalikes?.length && !sp?.note) return null
+  return (
+    <>
+      <h3>Attention aux confusions</h3>
+      {sp.note && <div className="small warn-box">{sp.note}</div>}
+      <ul className="lookalikes">
+        {sp.lookalikes.map((l) => (
+          <li key={l.name}>
+            <span className={`danger danger-${l.danger}`}>{DANGER_LABEL[l.danger] ?? l.danger}</span>
+            <span><strong>{l.name}</strong><small>{l.hint}</small></span>
+          </li>
+        ))}
+      </ul>
+    </>
+  )
+}
+
+export function DetailsPanel({ selected, classes, essenceOk, species, speciesList, onSpecies, onClose }) {
   if (!selected) return null
   const { zone, forest, weather } = selected
-  const essStatus = zone.essence_score >= essenceOk ? 'ok' : zone.essence_score >= 0.3 ? 'warn' : 'bad'
-  const c = scoreClass(zone.score, classes)
+  const sid = species === 'best' ? zone.best_species : species
+  const sp = speciesList.find((s) => s.id === sid)
+  const score = zone[`s_${sid}`] ?? null
+  const essScore = zone[`e_${sid}`] ?? 0
+  const w = weather?.species?.[sid]
+  const essStatus = essScore >= essenceOk ? 'ok' : essScore >= 0.3 ? 'warn' : 'bad'
+  const c = scoreClass(score, classes)
+  const others = speciesList
+    .map((s) => ({ ...s, score: zone[`s_${s.id}`] }))
+    .sort((a, b) => (b.score ?? -1) - (a.score ?? -1))
+  const forestScores = forest?.scores?.[sid]
+
   return (
     <aside className="details" aria-label="Détails de la zone">
       <button className="close" onClick={onClose} aria-label="Fermer">×</button>
       <div className="details-head">
-        <ScoreBadge score={zone.score} classes={classes} large />
+        <ScoreBadge score={score} classes={classes} large />
         <div>
           <h2>{forest?.name || zone.forest_name}</h2>
           <div className="muted">{TYPE_LABEL[zone.forest_type]}{forest?.dep ? ` · dép. ${forest.dep}` : ''}</div>
-          <div className="cls" style={{ color: c.color === NO_DATA_COLOR ? '#666' : c.color }}>{c.label}</div>
+          <div className="cls" style={{ color: c.color === NO_DATA_COLOR ? '#666' : c.color }}>
+            {sp ? `${sp.label} : ` : ''}{c.label}
+          </div>
         </div>
       </div>
 
-      <h3>Pourquoi ce score ?</h3>
+      <h3>Pourquoi ce score ?{sp ? ` (${sp.label.toLowerCase()})` : ''}</h3>
       <ul className="factors">
         <li className={essStatus}>
           <span>Essence : {zone.essence_label}</span><span>{MARK[essStatus]}</span>
-          <small>{zone.tfv} · {zone.area_ha} ha · ×{zone.essence_score}</small>
+          <small>{zone.tfv} · {zone.area_ha} ha · ×{essScore}</small>
         </li>
-        {weather?.factors?.map((f) => (
+        {w?.factors?.map((f) => (
           <li key={f.key} className={f.status}>
             <span>{f.label} : {f.value}</span><span>{MARK[f.status]}</span>
             <small>{[f.hint, `×${f.effect}`].filter(Boolean).join(' · ')}</small>
           </li>
         ))}
-        {weather?.error && <li className="bad"><span>Météo : {weather.error}</span><span>✗</span></li>}
+        {w?.error && <li className="bad"><span>Météo : {w.error}</span><span>✗</span></li>}
       </ul>
       <p className="formula small muted">
-        Score = 100 × essence ({zone.essence_score}) × météo ({weather?.score ?? '–'})
+        Score = 100 × essence ({essScore}) × météo ({w?.score ?? '–'})
       </p>
+
+      <h3>Toutes les espèces dans cette zone</h3>
+      <ul className="others">
+        {others.map((o) => (
+          <li key={o.id}>
+            <button className={o.id === sid ? 'on' : ''} onClick={() => onSpecies(o.id)}
+                    title={`Afficher la carte des ${o.label.toLowerCase()}`}>
+              <ScoreBadge score={o.score} classes={classes} />
+              <span>{o.label}</span>
+            </button>
+          </li>
+        ))}
+      </ul>
+
+      <Lookalikes sp={sp} />
 
       <h3>Météo (cellule ~10 km)</h3>
       {weather?.stale && <div className="small warn-txt">Données météo en cache (API indisponible).</div>}
@@ -198,7 +277,7 @@ export function DetailsPanel({ selected, classes, essenceOk, onClose }) {
             ))}
           </ul>
           <div className="small muted">
-            {forest.area_ha} ha cartographiés · score moyen {forest.score_mean ?? '–'} · meilleure zone {forest.best_score ?? '–'}
+            {forest.area_ha} ha cartographiés · score moyen {forestScores?.mean ?? '–'} · meilleure zone {forestScores?.best ?? '–'}
           </div>
         </>
       )}

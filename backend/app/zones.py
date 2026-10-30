@@ -14,7 +14,7 @@ from shapely.geometry import box
 from shapely.strtree import STRtree
 
 from . import weather, wfs
-from .scoring import essence_category, essence_score, load_config, total_score
+from .scoring import essence_category, essence_score, load_config, species_ids, total_score
 from .settings import MIN_PIECE_HA
 
 M_PER_DEG = 111_320.0
@@ -94,18 +94,19 @@ def _compute_unlocked(forests_raw: list, bd_raw: list, view: tuple) -> tuple[lis
         _pieces.move_to_end((fid, bid))
         geom, ha, x, y = piece
         code = bd_raw[n_bd]["properties"].get("code_tfv")
-        ess = essence_score(essence_category(code, cfg), cfg)
-        zones.append({
-            "type": "Feature", "geometry": geom,
-            "properties": {
-                "forest_id": fid, "forest_name": forests[fid]["name"],
-                "forest_type": forests[fid]["type"],
-                "code_tfv": code, "tfv": cfg["tfv"].get(code, {}).get("label", code),
-                "essence": ess["category"], "essence_label": ess["label"],
-                "group": ess["group"], "essence_score": ess["score"],
-                "area_ha": ha, "cell": weather.cell_of(x, y), "lon": x, "lat": y,
-            },
-        })
+        category = essence_category(code, cfg)
+        cat = cfg["essence_categories"][category]
+        props = {
+            "forest_id": fid, "forest_name": forests[fid]["name"],
+            "forest_type": forests[fid]["type"],
+            "code_tfv": code, "tfv": cfg["tfv"].get(code, {}).get("label", code),
+            "essence": category, "essence_label": cat["label"], "group": cat["group"],
+            "area_ha": ha, "cell": weather.cell_of(x, y), "lon": x, "lat": y,
+        }
+        # Propriétés à plat (e_<espèce>) : MapLibre ne lit pas les objets imbriqués
+        for sid in species_ids(cfg):
+            props[f"e_{sid}"] = essence_score(category, cfg, sid)["score"]
+        zones.append({"type": "Feature", "geometry": geom, "properties": props})
     while len(_pieces) > MAX_PIECES:
         _pieces.popitem(last=False)
     return zones, forests, outlines
@@ -146,18 +147,23 @@ def _summarise_forests(zones: list, forests: dict) -> None:
         info["area_ha"] = round(total, 1)
         info["essences"] = [{"label": k, "share": round(v / total, 3)}
                             for k, v in sorted(shares.items(), key=lambda kv: -kv[1])][:6] if total else []
-        scored = [p for p in pieces if p["score"] is not None]
-        sa = sum(p["area_ha"] for p in scored)
-        info["score_mean"] = round(sum(p["score"] * p["area_ha"] for p in scored) / sa) if sa else None
-        big = [p["score"] for p in scored if p["area_ha"] >= 1]
-        info["best_score"] = max(big) if big else None
+        info["scores"] = {}
+        for sid in [*species_ids(load_config()), "best"]:
+            key = f"s_{sid}"
+            scored = [p for p in pieces if p[key] is not None]
+            sa = sum(p["area_ha"] for p in scored)
+            big = [p[key] for p in scored if p["area_ha"] >= 1]
+            info["scores"][sid] = {
+                "mean": round(sum(p[key] * p["area_ha"] for p in scored) / sa) if sa else None,
+                "best": max(big) if big else None,
+            }
 
 
 async def compute_zones(view: tuple[float, float, float, float]) -> dict:
     """view = (min_lon, min_lat, max_lon, max_lat)."""
     tiles = wfs.tiles_for_bbox(*view)
     warnings: list[str] = []
-    async with httpx.AsyncClient(headers={"User-Agent": "cepes-france/0.1"}) as client:
+    async with httpx.AsyncClient(headers={"User-Agent": "mushroom-finder/0.2"}) as client:
         forests_raw, bd_raw = await asyncio.gather(
             wfs.fetch_layer(client, "forests", tiles, warnings),
             wfs.fetch_layer(client, "bdforet", tiles, warnings),
@@ -166,11 +172,17 @@ async def compute_zones(view: tuple[float, float, float, float]) -> dict:
         cells = {z["properties"]["cell"] for z in zones}
         meteo = await weather.get_cells(client, cells, warnings)
 
+    ids = species_ids(load_config())
     for z in zones:
         p = z["properties"]
-        w = meteo.get(p["cell"]) or {}
-        p["weather_score"] = w.get("score")
-        p["score"] = total_score(p["essence_score"], w.get("score"))
+        per_species = (meteo.get(p["cell"]) or {}).get("species", {})
+        best_sid, best = None, None
+        for sid in ids:
+            s = total_score(p[f"e_{sid}"], (per_species.get(sid) or {}).get("score"))
+            p[f"s_{sid}"] = s
+            if s is not None and (best is None or s > best):
+                best_sid, best = sid, s
+        p["s_best"], p["best_species"] = best, best_sid
     _summarise_forests(zones, forests)
     if not forests_raw and any("ONF" in w for w in warnings):
         raise wfs.ServiceUnavailable(" ".join(dict.fromkeys(warnings)))
@@ -192,14 +204,17 @@ def haversine_km(lon1, lat1, lon2, lat2) -> float:
 
 async def top_zones(lon: float, lat: float, radius_km: float, limit: int = 10,
                     groups: set[str] | None = None, forest_types: set[str] | None = None,
-                    min_score: int = 0) -> dict:
+                    min_score: int = 0, species: str = "cepe") -> dict:
+    """Meilleure zone de chaque forêt pour `species` (ou "best" : toutes espèces confondues)."""
+    key = f"s_{species}"
     dlat = radius_km / 111.32
     dlon = radius_km / (111.32 * math.cos(math.radians(lat)))
     res = await compute_zones((lon - dlon, lat - dlat, lon + dlon, lat + dlat))
     best: dict[str, dict] = {}
     for z in res["zones"]["features"]:
         p = z["properties"]
-        if p["score"] is None or p["score"] < min_score or p["area_ha"] < 1:
+        score = p[key]
+        if score is None or score < min_score or p["area_ha"] < 1:
             continue
         if groups and p["group"] not in groups:
             continue
@@ -209,7 +224,8 @@ async def top_zones(lon: float, lat: float, radius_km: float, limit: int = 10,
         if d > radius_km:
             continue
         cur = best.get(p["forest_id"])
-        if cur is None or (p["score"], p["area_ha"]) > (cur["score"], cur["area_ha"]):
-            best[p["forest_id"]] = {**p, "distance_km": round(d, 1)}
+        if cur is None or (score, p["area_ha"]) > (cur["score"], cur["area_ha"]):
+            best[p["forest_id"]] = {**p, "score": score, "distance_km": round(d, 1),
+                                    "species": p["best_species"] if species == "best" else species}
     ranked = sorted(best.values(), key=lambda p: (-p["score"], p["distance_km"]))[:limit]
     return {"results": ranked, "warnings": res["warnings"]}

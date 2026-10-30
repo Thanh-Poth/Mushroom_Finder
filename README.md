@@ -1,15 +1,28 @@
-# 🍄 Cèpes France
+# 🍄 Mushroom Finder
 
 **Français** · [English](README.en.md)
 
 Carte interactive qui estime, pour chaque zone des **forêts publiques** de France métropolitaine,
-la probabilité de trouver des cèpes (*Boletus edulis, aereus, pinophilus, reticulatus*) en croisant :
+la probabilité de trouver **six champignons comestibles parmi les plus recherchés** en croisant :
 
 1. les **forêts publiques** de l'ONF (domaniales, communales…),
 2. les **essences d'arbres** de la BD Forêt® V2 de l'IGN,
 3. la **météo des 14 derniers jours** + 3 jours de prévision (Open-Meteo).
 
-Chaque zone (forêt publique ∩ peuplement BD Forêt) reçoit un score de 0 à 100, avec le détail du calcul au clic.
+Chaque zone (forêt publique ∩ peuplement BD Forêt) reçoit un score de 0 à 100 **pour chaque espèce**,
+avec le détail du calcul au clic.
+
+| Espèce | Nom latin | Pleine saison | Arbres associés (score max) | Sosies dangereux signalés |
+|---|---|---|---|---|
+| **Cèpes** | *Boletus edulis, aereus, pinophilus, reticulatus* | sept. – nov. | chênes, hêtre, châtaignier, sapin/épicéa, pins | Bolet Satan (toxique) |
+| **Girolles** | *Cantharellus cibarius* | juil. – oct. | chênes, hêtre, châtaignier, sapin/épicéa | Clitocybe de l'olivier (toxique) |
+| **Trompettes de la mort** | *Craterellus cornucopioides* | sept. – nov. | hêtre, chênes | peu de confusion dangereuse |
+| **Pieds-de-mouton** | *Hydnum repandum* | oct. – déc. | hêtre, chênes, sapin/épicéa, mélanges | pas de sosie toxique majeur |
+| **Morilles** | *Morchella esculenta, M. elata* | mars – mai | peupleraies, frênes et ormes, coupes | **Gyromitre (mortel)**, Verpe (toxique) ; toxique crue |
+| **Lactaires délicieux / sanguins** | *Lactarius deliciosus, L. sanguifluus* | oct. – nov. | pins (y compris pin d'Alep) | Lactaire à toison (toxique) |
+
+Les amanites des Césars (risque de confusion avec des amanites mortelles) et les truffes (souterraines,
+souvent en truffières privées) ont été volontairement écartées.
 
 > **Estimation indicative, pas une garantie.** Ne consommez que des champignons identifiés avec
 > certitude par un pharmacien ou une association mycologique.
@@ -45,6 +58,7 @@ La carte s'ouvre sur la zone test de Gérardmer (Vosges). Elle fonctionne partou
 
 ## Utilisation
 
+- **Choisissez le champignon** recherché, ou **Toutes les espèces** pour colorer chaque zone selon l'espèce la plus probable.
 - **Zoomez** (niveau ≥ 11) pour afficher les forêts. Les données sont chargées à la demande pour la zone visible.
   - Le premier passage sur une zone prend 5 à 30 s, le temps d'interroger l'IGN.
   - Les passages suivants prennent environ 1 s grâce au cache.
@@ -52,10 +66,12 @@ La carte s'ouvre sur la zone test de Gérardmer (Vosges). Elle fonctionne partou
 - **Cliquer une zone** pour voir :
   - le nom de la forêt et son type ;
   - l'essence de la zone et les essences dominantes de la forêt ;
-  - le score et les facteurs (✓ / ⚠ / ✗) ;
+  - le score et les facteurs (✓ / ⚠ / ✗) pour l'espèce choisie ;
+  - le score des six espèces dans cette zone (cliquer pour changer d'espèce) ;
+  - les sosies dangereux de l'espèce et ses précautions (ex. : morilles à bien cuire) ;
   - le graphique pluie et température sur 14 jours, plus les prévisions.
 - **Filtres** : essences, type de forêt (domaniale / communale / autre), score minimum.
-- **🎯 Top 10 autour de moi** : meilleure zone (≥ 1 ha) de chaque forêt, dans un rayon réglable de 2 à 25 km.
+- **🎯 Top 10 autour de moi** : meilleure zone (≥ 1 ha) de chaque forêt pour l'espèce choisie, dans un rayon réglable de 2 à 25 km.
   - Les filtres actifs s'appliquent au classement.
   - Sans géolocalisation, la recherche se fait autour du centre de la carte.
 - **🛰 Photo aérienne** : bascule entre le Plan IGN et les orthophotos.
@@ -63,13 +79,18 @@ La carte s'ouvre sur la zone test de Gérardmer (Vosges). Elle fonctionne partou
 ## Formule du score
 
 ```
-score = 100 × score_essence × score_météo        (borné à 0–100)
-score_météo = pluie × température × gel × humidité_sol × pluie_ancienne × saison   (borné à 0–1)
+score(espèce) = 100 × score_essence(espèce) × score_météo(espèce)        (borné à 0–100)
+score_météo   = pluie × température × gel × humidité_sol × pluie_ancienne × saison   (borné à 0–1)
 ```
 
 Tous les seuils sont dans [config/scoring.yaml](config/scoring.yaml). Après modification, redémarrer le backend.
+Chaque espèce y a sa propre section `species` : score par essence, facteurs météo qui remplacent
+les valeurs par défaut (`weather_defaults`), saison mois par mois et sosies. Pour ajouter une espèce,
+il suffit de copier une section. Le mode « Toutes les espèces » prend, pour chaque zone, le meilleur score.
 
-| Facteur | Données | Valeurs par défaut |
+Valeurs pour les **cèpes** (les autres espèces décalent surtout la température et la saison) :
+
+| Facteur | Données | Valeurs (cèpes) |
 |---|---|---|
 | **Essence** | code TFV BD Forêt → catégorie ([config/tfv_mapping.yaml](config/tfv_mapping.yaml)) | chêne, hêtre, châtaignier 1,0 · sapin/épicéa 0,9 · pins 0,85 · mélanges 0,4–0,75 · douglas 0,15 · peupleraie, robinier, landes 0 |
 | **Pluie 7 j** | cumul J-7…J-1 | 20–60 mm = 1 ; < 10 mm ≤ 0,25 ; > 100 mm ≤ 0,55 |
@@ -78,6 +99,9 @@ Tous les seuils sont dans [config/scoring.yaml](config/scoring.yaml). Après mod
 | **Humidité du sol** | moyenne 0–7 cm | 0,10 m³/m³ → ×0,8 ; ≥ 0,30 → ×1,15 à 1,2 |
 | **Pluie ancienne** | cumul J-12…J-8 ≥ 20 mm **et** température 7 j entre 10 et 18 °C | ×1,2 (la pousse suit la pluie de 7 à 12 jours) |
 | **Saison** | mois en cours | sept.–oct. 1,0 · nov. 0,9 · été 0,6–0,7 · déc.–mars 0,1–0,3 |
+
+Principaux écarts par espèce : girolles 12–20 °C (été), trompettes 9–16 °C et sol très humide,
+pieds-de-mouton 6–15 °C et tolérants au gel léger, morilles 8–14 °C au printemps, lactaires uniquement sous les pins.
 
 Classes de la légende : ≥ 60 très probable (vert foncé), ≥ 40 probable, ≥ 20 possible (orange), < 20 peu probable (gris).
 Une zone grise claire signifie « météo indisponible ».
@@ -108,10 +132,10 @@ docs/      DATA_SOURCES.md (couches, champs, licences, requêtes testées)
 
 | Route | Description |
 |---|---|
-| `GET /api/zones?bbox=minLon,minLat,maxLon,maxLat` | zones scorées (GeoJSON), contours, résumé par forêt, météo par cellule, avertissements |
-| `GET /api/top?lat=&lon=&radius_km=10&groups=Chênes\|Hêtre&forest_types=domaniale&min_score=0` | Top N des zones autour d'un point |
+| `GET /api/zones?bbox=minLon,minLat,maxLon,maxLat` | zones scorées pour toutes les espèces (propriétés `s_<espèce>`, `s_best`, `best_species`), contours, résumé par forêt, météo par cellule, avertissements |
+| `GET /api/top?lat=&lon=&radius_km=10&species=girolle&forest_types=domaniale&min_score=0` | Top N des zones autour d'un point. `species` : `cepe`, `girolle`, `trompette`, `pied_de_mouton`, `morille`, `lactaire` ou `best` ; `groups` filtre les essences (ex. `Chênes`, plusieurs valeurs séparées par une barre verticale) |
 | `GET /api/geocode?q=` | recherche de commune (géocodage IGN) |
-| `GET /api/meta` | classes de la légende, groupes d'essences |
+| `GET /api/meta` | classes de la légende, groupes d'essences, espèces (saison, sosies) |
 
 ## Tests
 
@@ -121,6 +145,7 @@ cd backend
 ```
 
 - **Score** : été sec, automne doux et humide, gel, sol détrempé, peupleraie, absence de température du sol.
+- **Espèces** : girolles en été, morilles au printemps sous peupliers (et pas en automne), trompettes sous hêtre plutôt que sous pin, pieds-de-mouton en début d'hiver, lactaires uniquement sous les pins, cohérence de la configuration.
 - **Mapping** : les 32 codes TFV sont reconnus.
 - **Résilience** : panne WFS avec et sans cache, panne de l'API météo.
 - **Sécurité** : requêtes inter-sites et hôtes inconnus refusés, absence d'en-tête CORS, paramètres bornés.
@@ -148,6 +173,7 @@ Voir les [règles de cueillette de l'ONF](https://www.onf.fr/vivre-la-foret/que-
 
 ## Limites connues
 
+- **Profils d'espèces approximatifs** : ils reposent sur l'écologie générale de chaque espèce. Les morilles dépendent beaucoup de facteurs absents des données (frênes isolés, brûlis, sols calcaires, vergers), et les lactaires sanguins du Midi ne sont pas distingués du lactaire délicieux.
 - **Modèle heuristique, non calibré** : les seuils sont des valeurs de départ, à ajuster avec de vraies récoltes. Le modèle ignore le sol (pH), l'altitude, l'exposition, l'âge des peuplements et la pression de cueillette.
 - **BD Forêt V2 date de 2006 à 2019 selon les départements** : coupes, tempêtes et dépérissements récents (scolytes sur l'épicéa) ne sont pas pris en compte.
 - **Les mélanges** (« mélange de feuillus », « feuillus prépondérants et conifères »…) ne précisent pas les essences présentes : ils reçoivent un score intermédiaire alors qu'ils contiennent souvent du chêne ou du hêtre.

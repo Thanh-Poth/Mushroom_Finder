@@ -1,4 +1,4 @@
-# Sources de données — Cèpes France
+# Sources de données — Mushroom Finder
 
 Toutes les sources ci-dessous ont été **testées le 29/10/2026** avec les requêtes indiquées (réponses HTTP 200, données réelles).
 

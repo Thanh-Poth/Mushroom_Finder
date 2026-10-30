@@ -33,5 +33,5 @@ def test_wfs_outage_without_cache_warns():
 def test_weather_outage_gives_null_score_and_warning():
     warnings = []
     out = asyncio.run(weather.get_cells(DownClient(), {"9999_9999"}, warnings))
-    assert out["9999_9999"]["score"] is None
+    assert all(w["score"] is None for w in out["9999_9999"]["species"].values())
     assert "Open-Meteo" in warnings[0]

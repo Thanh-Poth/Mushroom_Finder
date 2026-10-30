@@ -1,4 +1,4 @@
-"""Modèle de score cèpes : score = 100 × score_essence × score_météo.
+"""Modèle de score par espèce : score = 100 × score_essence × score_météo.
 
 Fonctions pures, sans I/O hormis le chargement des YAML, pour être testables.
 Tous les seuils viennent de config/scoring.yaml et config/tfv_mapping.yaml.
@@ -24,7 +24,17 @@ def load_config(config_dir: Path = CONFIG_DIR) -> dict:
         cfg = yaml.safe_load(f)
     with open(config_dir / "tfv_mapping.yaml", encoding="utf-8") as f:
         cfg["tfv"] = yaml.safe_load(f)
+    # Météo résolue par espèce : défauts + facteurs surchargés + saison
+    cfg["species_weather"] = {
+        sid: {**cfg["weather_defaults"], **(sp.get("weather") or {}),
+              "season": sp["season"], "season_ok_months": sp["season_ok_months"]}
+        for sid, sp in cfg["species"].items()
+    }
     return cfg
+
+
+def species_ids(cfg: dict) -> list[str]:
+    return list(cfg["species"])
 
 
 def interp(points: list[list[float]], x: float) -> float:
@@ -52,15 +62,16 @@ def essence_category(code_tfv: str | None, cfg: dict) -> str:
     return entry["category"] if entry else "sans_couvert"
 
 
-def essence_score(category: str, cfg: dict) -> dict:
-    ess = cfg["essences"][category]
+def essence_score(category: str, cfg: dict, species: str = "cepe") -> dict:
+    cat = cfg["essence_categories"][category]
+    score = float(cfg["species"][species]["essences"].get(category, 0.0))
     return {
         "category": category,
-        "label": ess["label"],
-        "group": ess["group"],
-        "score": float(ess["score"]),
-        "status": "ok" if ess["score"] >= cfg["essence_ok_threshold"]
-        else ("warn" if ess["score"] >= 0.3 else "bad"),
+        "label": cat["label"],
+        "group": cat["group"],
+        "score": score,
+        "status": "ok" if score >= cfg["essence_ok_threshold"]
+        else ("warn" if score >= 0.3 else "bad"),
     }
 
 
@@ -79,13 +90,13 @@ def _avg(values) -> float | None:
     return mean(values) if values else None
 
 
-def weather_score(days: list[dict], today: date, cfg: dict) -> dict:
-    """Calcule le score météo (0..1) et les facteurs explicatifs.
+def weather_score(days: list[dict], today: date, cfg: dict, species: str = "cepe") -> dict:
+    """Calcule le score météo (0..1) d'une espèce et les facteurs explicatifs.
 
     `days` : liste de {date, rain, tmin, tmax, tmean, soil_t, soil_m}
     `today` : date de référence ; la fenêtre principale est J-7 … J-1.
     """
-    w = cfg["weather"]
+    w = cfg["species_weather"][species]
     main = _window(days, today, w["main_window_days"], 1)
     lag = _window(days, today, w["lag_window"]["from_day"], w["lag_window"]["to_day"])
     if len(main) < w["main_window_days"] - 1:

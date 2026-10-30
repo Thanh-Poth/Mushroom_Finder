@@ -8,7 +8,7 @@ from datetime import date
 import httpx
 
 from . import cache
-from .scoring import load_config, weather_score
+from .scoring import load_config, species_ids, weather_score
 from .settings import (FORECAST_DAYS, OPEN_METEO_URL, PAST_DAYS, WEATHER_BATCH,
                        WEATHER_GRID_DEG, WEATHER_TTL)
 
@@ -57,7 +57,7 @@ async def _fetch_batch(client: httpx.AsyncClient, cells: list[str]) -> dict[str,
 
 
 async def get_cells(client, cells: set[str], warnings: list) -> dict[str, dict]:
-    """Météo + score météo par cellule. Valeur None si indisponible."""
+    """Météo + score météo de chaque espèce par cellule (score None si indisponible)."""
     cfg = load_config()
     raw, missing = {}, []
     for c in cells:
@@ -86,10 +86,12 @@ async def get_cells(client, cells: set[str], warnings: list) -> dict[str, dict]:
     for c, v in raw.items():
         lon, lat = cell_center(c)
         if v is None:
-            out[c] = {"lon": lon, "lat": lat, "score": None, "days": [], "factors": [],
-                      "summary": {}, "error": "météo indisponible"}
+            unavailable = {"score": None, "factors": [], "summary": {}, "error": "météo indisponible"}
+            out[c] = {"lon": lon, "lat": lat, "days": [],
+                      "species": {sid: unavailable for sid in species_ids(cfg)}}
             continue
-        w = weather_score(v["days"], date.fromisoformat(v["today"]), cfg)
+        today = date.fromisoformat(v["today"])
         out[c] = {"lon": lon, "lat": lat, "today": v["today"], "days": v["days"],
-                  "stale": v["stale"], **w}
+                  "stale": v["stale"],
+                  "species": {sid: weather_score(v["days"], today, cfg, sid) for sid in species_ids(cfg)}}
     return out

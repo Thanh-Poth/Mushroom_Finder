@@ -1,45 +1,47 @@
-# Modèle de score « Cèpes France »
-# score = 100 × score_essence × score_météo
+# Modèle de score « Mushroom Finder »
+# score(espèce) = 100 × score_essence(espèce) × score_météo(espèce)
 # Tous les seuils sont modifiables ici sans toucher au code (redémarrer le backend).
 #
 # Les courbes "points" sont des interpolations linéaires [[x, valeur], ...] :
 # en dessous du premier x on garde la première valeur, au-dessus du dernier la dernière.
+#
+# Valeurs de départ heuristiques (écologie générale des espèces), NON calibrées
+# sur des récoltes réelles : à ajuster.
 
 # ---------------------------------------------------------------------------
-# 1. Essences (symbiose mycorhizienne avec Boletus edulis / aereus / pinophilus / reticulatus)
-#    Le rattachement code TFV -> catégorie est dans tfv_mapping.yaml.
+# 1. Catégories d'essences (le rattachement code TFV -> catégorie est dans tfv_mapping.yaml)
 #    group = regroupement utilisé par le filtre de l'interface.
 # ---------------------------------------------------------------------------
-essences:
-  chene:                  { label: "Chênes",                 score: 1.00, group: "Chênes" }
-  chene_vert:             { label: "Chênes verts / lièges",  score: 0.60, group: "Chênes" }
-  hetre:                  { label: "Hêtre",                  score: 1.00, group: "Hêtre" }
-  chataignier:            { label: "Châtaignier",            score: 1.00, group: "Châtaignier" }
-  sapin_epicea:           { label: "Sapin, épicéa",          score: 0.90, group: "Sapin / épicéa" }
-  pin:                    { label: "Pins",                   score: 0.85, group: "Pins" }
-  pin_alep:               { label: "Pin d'Alep",             score: 0.25, group: "Pins" }
-  mixte:                  { label: "Mélange feuillus-conifères", score: 0.75, group: "Mélanges" }
-  melange_feuillus:       { label: "Mélange de feuillus",    score: 0.70, group: "Mélanges" }
-  feuillus_indetermines:  { label: "Feuillus (îlots)",       score: 0.55, group: "Mélanges" }
-  coniferes_indetermines: { label: "Conifères divers",       score: 0.40, group: "Mélanges" }
-  foret_ouverte:          { label: "Forêt ouverte",          score: 0.45, group: "Mélanges" }
-  feuillus_autres:        { label: "Autre feuillu",          score: 0.30, group: "Autres" }
-  meleze:                 { label: "Mélèze",                 score: 0.30, group: "Autres" }
-  douglas:                { label: "Douglas (exotique)",     score: 0.15, group: "Autres" }
-  robinier:               { label: "Robinier",               score: 0.00, group: "Autres" }
-  peupleraie:             { label: "Peupleraie",             score: 0.00, group: "Autres" }
-  sans_couvert:           { label: "Sans couvert arboré",    score: 0.05, group: "Autres" }
-  lande:                  { label: "Lande / herbacée",       score: 0.00, group: "Autres" }
+essence_categories:
+  chene:                  { label: "Chênes",                     group: "Chênes" }
+  chene_vert:             { label: "Chênes verts / lièges",      group: "Chênes" }
+  hetre:                  { label: "Hêtre",                      group: "Hêtre" }
+  chataignier:            { label: "Châtaignier",                group: "Châtaignier" }
+  sapin_epicea:           { label: "Sapin, épicéa",              group: "Sapin / épicéa" }
+  pin:                    { label: "Pins",                       group: "Pins" }
+  pin_alep:               { label: "Pin d'Alep",                 group: "Pins" }
+  mixte:                  { label: "Mélange feuillus-conifères", group: "Mélanges" }
+  melange_feuillus:       { label: "Mélange de feuillus",        group: "Mélanges" }
+  feuillus_indetermines:  { label: "Feuillus (îlots)",           group: "Mélanges" }
+  coniferes_indetermines: { label: "Conifères divers",           group: "Mélanges" }
+  foret_ouverte:          { label: "Forêt ouverte",              group: "Mélanges" }
+  feuillus_autres:        { label: "Autre feuillu",              group: "Autres" }
+  meleze:                 { label: "Mélèze",                     group: "Autres" }
+  douglas:                { label: "Douglas (exotique)",         group: "Autres" }
+  robinier:               { label: "Robinier",                   group: "Autres" }
+  peupleraie:             { label: "Peupleraie",                 group: "Autres" }
+  sans_couvert:           { label: "Sans couvert arboré",        group: "Autres" }
+  lande:                  { label: "Lande / herbacée",           group: "Autres" }
 
 # Seuil au-dessus duquel l'essence est affichée « ✓ »
 essence_ok_threshold: 0.6
 
 # ---------------------------------------------------------------------------
-# 2. Météo
+# 2. Météo par défaut (chaque espèce peut surcharger un facteur entier)
 #    Fenêtre principale : les 7 derniers jours complets (J-7 … J-1).
 #    Fenêtre « pluie ancienne » : J-12 … J-8 (pousse décalée de 7 à 12 jours).
 # ---------------------------------------------------------------------------
-weather:
+weather_defaults:
   main_window_days: 7
   lag_window: { from_day: 12, to_day: 8 }   # J-12 à J-8 inclus
 
@@ -66,24 +68,228 @@ weather:
   # Pluie ancienne (J-12…J-8) suivie de temps doux -> bonus
   lagged_rain:
     min_rain_mm: 20
-    mild_temp_range: [10, 18]  # température moyenne 7 j (= plage optimale)
+    mild_temp_range: [10, 18]  # température moyenne 7 j
     bonus: 1.2
 
-  # Saison : multiplicateur par mois (1 = janvier)
-  season:
-    1: 0.10
-    2: 0.10
-    3: 0.15
-    4: 0.30
-    5: 0.50
-    6: 0.60
-    7: 0.60
-    8: 0.70
-    9: 1.00
-    10: 1.00
-    11: 0.90
-    12: 0.30
-  season_ok_months: [9, 10, 11]
+# ---------------------------------------------------------------------------
+# 3. Espèces
+#    essences : score 0..1 par catégorie (catégorie absente = 0)
+#    weather  : facteurs météo qui remplacent ceux de weather_defaults
+#    season   : multiplicateur par mois (1 = janvier)
+#    lookalikes : sosies à connaître (danger: mortel | toxique | faible)
+# ---------------------------------------------------------------------------
+species:
+
+  cepe:
+    label: "Cèpes"
+    latin: "Boletus edulis, aereus, pinophilus, reticulatus"
+    color: "#8d5a2b"
+    essences:
+      chene: 1.0
+      chene_vert: 0.6
+      hetre: 1.0
+      chataignier: 1.0
+      sapin_epicea: 0.9
+      pin: 0.85
+      pin_alep: 0.25
+      mixte: 0.75
+      melange_feuillus: 0.7
+      feuillus_indetermines: 0.55
+      coniferes_indetermines: 0.4
+      foret_ouverte: 0.45
+      feuillus_autres: 0.3
+      meleze: 0.3
+      douglas: 0.15
+      sans_couvert: 0.05
+    weather: {}
+    season: { 1: 0.1, 2: 0.1, 3: 0.15, 4: 0.3, 5: 0.5, 6: 0.6, 7: 0.6, 8: 0.7, 9: 1.0, 10: 1.0, 11: 0.9, 12: 0.3 }
+    season_ok_months: [9, 10, 11]
+    lookalikes:
+      - { name: "Bolet Satan (Rubroboletus satanas)", danger: toxique,
+          hint: "pores rouges, pied rouge réticulé, chair bleuissante" }
+      - { name: "Bolet amer (Tylopilus felleus)", danger: faible,
+          hint: "pores rosés, réseau sombre sur le pied, goût très amer (immangeable)" }
+
+  girolle:
+    label: "Girolles"
+    latin: "Cantharellus cibarius"
+    color: "#e0a100"
+    essences:
+      chene: 1.0
+      chene_vert: 0.5
+      hetre: 1.0
+      chataignier: 0.9
+      sapin_epicea: 0.85
+      pin: 0.75
+      pin_alep: 0.2
+      mixte: 0.8
+      melange_feuillus: 0.75
+      feuillus_indetermines: 0.5
+      coniferes_indetermines: 0.45
+      foret_ouverte: 0.4
+      feuillus_autres: 0.3
+      meleze: 0.3
+      douglas: 0.25
+      sans_couvert: 0.05
+    weather:
+      rain_7d:
+        points: [[0, 0.05], [10, 0.3], [20, 1.0], [70, 1.0], [110, 0.5], [160, 0.2]]
+        ok_range: [20, 70]
+      temperature:
+        prefer: soil
+        points: [[4, 0.0], [8, 0.3], [12, 1.0], [20, 1.0], [24, 0.5], [30, 0.1]]
+        ok_range: [12, 20]
+      lagged_rain: { min_rain_mm: 20, mild_temp_range: [12, 20], bonus: 1.2 }
+    season: { 1: 0.05, 2: 0.05, 3: 0.05, 4: 0.1, 5: 0.3, 6: 0.7, 7: 0.9, 8: 1.0, 9: 1.0, 10: 0.8, 11: 0.4, 12: 0.1 }
+    season_ok_months: [7, 8, 9, 10]
+    lookalikes:
+      - { name: "Clitocybe de l'olivier (Omphalotus olearius)", danger: toxique,
+          hint: "vraies lames serrées, pousse en touffes sur souches ou racines" }
+      - { name: "Fausse girolle (Hygrophoropsis aurantiaca)", danger: faible,
+          hint: "vraies lames fourchues, orange vif, chair molle" }
+
+  trompette:
+    label: "Trompettes de la mort"
+    latin: "Craterellus cornucopioides"
+    color: "#37474f"
+    essences:
+      hetre: 1.0
+      chene: 0.9
+      chataignier: 0.6
+      chene_vert: 0.4
+      melange_feuillus: 0.85
+      mixte: 0.65
+      feuillus_indetermines: 0.6
+      feuillus_autres: 0.3
+      foret_ouverte: 0.3
+      sapin_epicea: 0.2
+      coniferes_indetermines: 0.15
+      pin: 0.1
+    weather:
+      rain_7d:
+        points: [[0, 0.02], [15, 0.2], [30, 1.0], [90, 1.0], [140, 0.6]]
+        ok_range: [30, 90]
+      temperature:
+        prefer: soil
+        points: [[2, 0.0], [6, 0.4], [9, 1.0], [16, 1.0], [20, 0.5], [26, 0.1]]
+        ok_range: [9, 16]
+      soil_moisture:
+        points: [[0.10, 0.6], [0.20, 0.9], [0.30, 1.15], [0.40, 1.25]]
+        ok_min: 0.28
+      lagged_rain: { min_rain_mm: 25, mild_temp_range: [9, 16], bonus: 1.2 }
+    season: { 1: 0.05, 2: 0.05, 3: 0.05, 4: 0.05, 5: 0.1, 6: 0.2, 7: 0.4, 8: 0.7, 9: 0.9, 10: 1.0, 11: 1.0, 12: 0.4 }
+    season_ok_months: [9, 10, 11]
+    lookalikes:
+      - { name: "Peu de confusion dangereuse", danger: faible,
+          hint: "vérifier la forme de trompette creuse jusqu'au pied, sans lames" }
+
+  pied_de_mouton:
+    label: "Pieds-de-mouton"
+    latin: "Hydnum repandum"
+    color: "#c58b4c"
+    essences:
+      hetre: 1.0
+      chene: 0.9
+      sapin_epicea: 0.9
+      mixte: 0.9
+      melange_feuillus: 0.85
+      chataignier: 0.8
+      pin: 0.7
+      feuillus_indetermines: 0.6
+      coniferes_indetermines: 0.55
+      chene_vert: 0.5
+      foret_ouverte: 0.45
+      feuillus_autres: 0.4
+      meleze: 0.4
+      douglas: 0.3
+      pin_alep: 0.2
+      sans_couvert: 0.05
+    weather:
+      rain_7d:
+        points: [[0, 0.05], [10, 0.3], [20, 1.0], [70, 1.0], [110, 0.5]]
+        ok_range: [20, 70]
+      temperature:
+        prefer: soil
+        points: [[0, 0.1], [3, 0.4], [6, 1.0], [15, 1.0], [19, 0.5], [25, 0.1]]
+        ok_range: [6, 15]
+      frost:
+        points: [[-6, 0.3], [-3, 0.6], [0, 0.85], [0.5, 1.0]]
+      lagged_rain: { min_rain_mm: 20, mild_temp_range: [6, 15], bonus: 1.2 }
+    season: { 1: 0.3, 2: 0.1, 3: 0.05, 4: 0.05, 5: 0.05, 6: 0.1, 7: 0.2, 8: 0.4, 9: 0.7, 10: 1.0, 11: 1.0, 12: 0.8 }
+    season_ok_months: [10, 11, 12]
+    lookalikes:
+      - { name: "Pas de sosie toxique majeur", danger: faible,
+          hint: "vérifier les aiguillons (ni lames ni tubes) sous le chapeau" }
+
+  morille:
+    label: "Morilles"
+    latin: "Morchella esculenta, M. elata"
+    color: "#6d4c41"
+    note: "Toxique crue ou mal cuite : toujours bien cuire (au moins 20 min)."
+    essences:
+      peupleraie: 0.9
+      feuillus_autres: 0.8          # frênes, ormes
+      melange_feuillus: 0.6
+      feuillus_indetermines: 0.6
+      foret_ouverte: 0.5
+      sans_couvert: 0.5             # coupes, brûlis
+      mixte: 0.4
+      coniferes_indetermines: 0.4
+      sapin_epicea: 0.4             # morilles coniques en montagne
+      meleze: 0.4
+      chene: 0.3
+      hetre: 0.3
+      pin: 0.3
+      douglas: 0.3
+      robinier: 0.3
+      chataignier: 0.2
+      pin_alep: 0.1
+      chene_vert: 0.1
+      lande: 0.1
+    weather:
+      rain_7d:
+        points: [[0, 0.1], [8, 0.4], [15, 1.0], [50, 1.0], [90, 0.5]]
+        ok_range: [15, 50]
+      temperature:
+        prefer: soil
+        points: [[2, 0.0], [5, 0.3], [8, 1.0], [14, 1.0], [18, 0.5], [24, 0.1]]
+        ok_range: [8, 14]
+      frost:
+        points: [[-5, 0.25], [-2, 0.6], [0, 0.85], [0.5, 1.0]]
+      lagged_rain: { min_rain_mm: 15, mild_temp_range: [8, 14], bonus: 1.2 }
+    season: { 1: 0.02, 2: 0.15, 3: 0.7, 4: 1.0, 5: 0.8, 6: 0.2, 7: 0.02, 8: 0.02, 9: 0.02, 10: 0.02, 11: 0.02, 12: 0.02 }
+    season_ok_months: [3, 4, 5]
+    lookalikes:
+      - { name: "Gyromitre (Gyromitra esculenta)", danger: mortel,
+          hint: "chapeau en circonvolutions de cerveau (pas d'alvéoles), intérieur cloisonné" }
+      - { name: "Verpe de Bohême (Verpa bohemica)", danger: toxique,
+          hint: "chapeau libre, posé sur le pied comme un dé à coudre" }
+
+  lactaire:
+    label: "Lactaires délicieux / sanguins"
+    latin: "Lactarius deliciosus, L. sanguifluus"
+    color: "#e65100"
+    essences:
+      pin: 1.0
+      pin_alep: 0.85
+      foret_ouverte: 0.5
+      coniferes_indetermines: 0.45
+      mixte: 0.4
+      sapin_epicea: 0.35
+      meleze: 0.2
+      douglas: 0.15
+    weather:
+      temperature:
+        prefer: soil
+        points: [[3, 0.0], [7, 0.3], [10, 1.0], [18, 1.0], [22, 0.45], [28, 0.05]]
+        ok_range: [10, 18]
+    season: { 1: 0.2, 2: 0.05, 3: 0.05, 4: 0.05, 5: 0.05, 6: 0.05, 7: 0.05, 8: 0.3, 9: 0.8, 10: 1.0, 11: 1.0, 12: 0.6 }
+    season_ok_months: [10, 11]
+    lookalikes:
+      - { name: "Lactaire à toison (Lactarius torminosus)", danger: toxique,
+          hint: "chapeau laineux sur la marge, lait blanc (et non orange ou rouge)" }
+      - { name: "Autres lactaires à lait blanc", danger: toxique,
+          hint: "le lait doit être orange carotte ou rouge vineux" }
 
 # Bornes d'affichage de la légende (score 0..100)
 classes:

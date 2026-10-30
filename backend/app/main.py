@@ -1,4 +1,4 @@
-"""API FastAPI « Cèpes France »."""
+"""API FastAPI « Mushroom Finder »."""
 import logging
 
 import httpx
@@ -8,12 +8,12 @@ from fastapi.responses import JSONResponse
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from . import wfs
-from .scoring import load_config
+from .scoring import load_config, species_ids
 from .settings import ALLOWED_HOSTS, GEOCODE_URL, TOP_MAX_RADIUS_KM
 from .zones import compute_zones, top_zones
 
 logging.basicConfig(level=logging.INFO)
-app = FastAPI(title="Cèpes France API", version="0.1.0")
+app = FastAPI(title="Mushroom Finder API", version="0.2.0")
 # Pas de CORS : le frontend passe par le proxy Vite (même origine).
 # Host contrôlé contre le DNS rebinding.
 app.add_middleware(TrustedHostMiddleware, allowed_hosts=ALLOWED_HOSTS)
@@ -54,8 +54,12 @@ def health():
 @app.get("/api/meta")
 def meta():
     cfg = load_config()
-    groups = list(dict.fromkeys(e["group"] for e in cfg["essences"].values()))
-    return {"classes": cfg["classes"], "groups": groups, "essences": cfg["essences"],
+    groups = list(dict.fromkeys(e["group"] for e in cfg["essence_categories"].values()))
+    species = [{"id": sid, "label": sp["label"], "latin": sp["latin"], "color": sp["color"],
+                "season_ok_months": sp["season_ok_months"], "lookalikes": sp.get("lookalikes", []),
+                "note": sp.get("note")}
+               for sid, sp in cfg["species"].items()]
+    return {"classes": cfg["classes"], "groups": groups, "species": species,
             "essence_ok_threshold": cfg["essence_ok_threshold"]}
 
 
@@ -67,11 +71,13 @@ async def zones(bbox: str):
 @app.get("/api/top")
 async def top(lat: float, lon: float, radius_km: float = Query(10, gt=0),
               limit: int = Query(10, ge=1, le=50), groups: str = "", forest_types: str = "",
-              min_score: int = 0):
+              min_score: int = 0, species: str = "cepe"):
+    if species != "best" and species not in species_ids(load_config()):
+        raise HTTPException(400, "Espèce inconnue")
     radius = min(radius_km, TOP_MAX_RADIUS_KM)
     g = {x for x in groups.split("|") if x} or None
     t = {x for x in forest_types.split("|") if x} or None
-    res = await _guard(top_zones(lon, lat, radius, limit, g, t, min_score))
+    res = await _guard(top_zones(lon, lat, radius, limit, g, t, min_score, species))
     return res | {"radius_km": radius}
 
 

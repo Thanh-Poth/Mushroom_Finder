@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import MapView from './MapView.jsx'
-import { DetailsPanel, Filters, Legend, SearchBox, TopPanel } from './Panels.jsx'
+import { DetailsPanel, Filters, Legend, SearchBox, SpeciesPicker, TopPanel } from './Panels.jsx'
 import { fetchMeta, fetchTop, fetchZones } from './api.js'
 
 const MIN_ZOOM = 11
@@ -16,7 +16,12 @@ const DEFAULT_META = {
     { min: 0, label: 'Peu probable', color: '#9e9e9e' },
   ],
   groups: [],
+  species: [],
   essence_ok_threshold: 0.6,
+}
+
+function loadSpecies() {
+  try { return localStorage.getItem('species') || 'cepe' } catch { return 'cepe' }
 }
 
 function snapshot(data, key) {
@@ -50,6 +55,7 @@ export default function App() {
   const [radius, setRadius] = useState(10)
   const [top, setTop] = useState({})
   const [menuOpen, setMenuOpen] = useState(false)
+  const [species, setSpecies] = useState(loadSpecies)
   const pending = useRef(null)
   const ctrl = useRef(null)
   const timer = useRef(null)
@@ -94,12 +100,22 @@ export default function App() {
   dataRef.current = data
   const onSelect = useCallback((key) => setSelected(snapshot(dataRef.current, key)), [])
 
+  const chooseSpecies = (id) => {
+    setSpecies(id)
+    setTop({})
+    try { localStorage.setItem('species', id) } catch { /* stockage indisponible */ }
+  }
+  const scoreKey = `s_${species}`
+  const speciesLabel = species === 'best'
+    ? 'meilleure espèce'
+    : meta.species.find((s) => s.id === species)?.label ?? species
+
   const mapFilter = useMemo(() => {
     const f = ['all', ['in', ['get', 'forest_type'], ['literal', [...filters.types]]]]
     if (meta.groups.length) f.push(['in', ['get', 'group'], ['literal', [...filters.groups]]])
-    if (filters.minScore > 0) f.push(['>=', ['coalesce', ['get', 'score'], -1], filters.minScore])
+    if (filters.minScore > 0) f.push(['>=', ['coalesce', ['get', scoreKey], -1], filters.minScore])
     return f
-  }, [filters, meta.groups])
+  }, [filters, meta.groups, scoreKey])
 
   const locate = async () => {
     try {
@@ -125,7 +141,7 @@ export default function App() {
     }
     try {
       const r = await fetchTop({ ...pos, radius, groups: [...filters.groups], types: [...filters.types],
-                                 minScore: filters.minScore })
+                                 minScore: filters.minScore, species })
       setTop({ results: r.results, note: note || (r.warnings.length ? r.warnings.join(' ') : null) })
     } catch (e) {
       setTop({ error: e.message, note })
@@ -145,17 +161,19 @@ export default function App() {
     <div className="app">
       <header className="topbar">
         <button className="menu-btn" onClick={() => setMenuOpen((o) => !o)} aria-label="Menu">☰</button>
-        <h1>🍄 Cèpes France</h1>
+        <h1>🍄 Mushroom Finder</h1>
       </header>
 
       <div className={menuOpen ? 'sidebar open' : 'sidebar'}>
-        <h1 className="brand">🍄 Cèpes France</h1>
-        <p className="muted small">Probabilité de pousse des cèpes dans les forêts publiques, d'après les essences et la météo des 7 derniers jours.</p>
+        <h1 className="brand">🍄 Mushroom Finder</h1>
+        <p className="muted small">Probabilité de pousse des champignons comestibles dans les forêts publiques, d'après les essences et la météo des 7 derniers jours.</p>
 
         <div className="callout">
           <strong>Estimation indicative, pas une garantie.</strong> Ne consommez que des champignons
           identifiés avec certitude par un pharmacien ou une association mycologique.
         </div>
+
+        <SpeciesPicker list={meta.species} value={species} onChange={chooseSpecies} />
 
         <SearchBox onPick={(r) => { setFlyTarget({ center: [r.lon, r.lat], zoom: 13 }); setMenuOpen(false) }} />
         <div className="row">
@@ -167,8 +185,8 @@ export default function App() {
 
         <Filters groups={meta.groups} filters={filters} setFilters={setFilters} />
         <TopPanel state={top} radius={radius} setRadius={setRadius} onRun={runTop} onPick={pickTop}
-                  classes={meta.classes} />
-        <Legend classes={meta.classes} />
+                  classes={meta.classes} species={species} speciesList={meta.species} />
+        <Legend classes={meta.classes} title={speciesLabel} />
 
         <section className="legal small">
           <h3>Réglementation</h3>
@@ -180,7 +198,7 @@ export default function App() {
       </div>
 
       <main className="map-wrap">
-        <MapView initial={INITIAL} data={data} classes={meta.classes} filter={mapFilter}
+        <MapView initial={INITIAL} data={data} classes={meta.classes} scoreKey={scoreKey} filter={mapFilter}
                  selected={selected} onSelect={onSelect} onMove={onMove} flyTarget={flyTarget}
                  userPos={userPos} basemap={basemap} />
         <div className="status" role="status">
@@ -190,12 +208,13 @@ export default function App() {
               ? 'Chargement des forêts et de la météo… (1er passage sur une zone : jusqu\'à 30 s)'
               : status.error
                 ? <span className="err">⚠ {status.error}</span>
-                : data && `${nForests} forêts publiques · ${nZones} zones`}
+                : data && `${speciesLabel} · ${nForests} forêts publiques · ${nZones} zones`}
           {data?.warnings?.length > 0 && !status.loading && (
             <div className="warn-txt">{data.warnings.join(' ')}</div>
           )}
         </div>
         <DetailsPanel selected={selected} classes={meta.classes} essenceOk={meta.essence_ok_threshold}
+                      species={species} speciesList={meta.species} onSpecies={chooseSpecies}
                       onClose={() => setSelected(null)} />
       </main>
     </div>

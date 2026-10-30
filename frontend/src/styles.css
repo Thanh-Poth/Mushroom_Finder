@@ -126,3 +126,27 @@ a { color: var(--accent); }
   .details { left: 16px; right: 16px; width: auto; top: auto; bottom: 30px; max-height: 60%; }
   .status { max-width: calc(100% - 32px); }
 }
+
+/* Sélecteur d'espèce */
+.species { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.sp { display: flex; gap: 8px; align-items: center; text-align: left; padding: 7px 8px; }
+.sp.on { background: #e5f0e7; border-color: var(--accent); }
+.sp-all { grid-column: 1 / -1; }
+.sp-txt { display: flex; flex-direction: column; font-size: 0.8rem; line-height: 1.2; min-width: 0; }
+.sp-txt .muted { font-size: 0.72rem; }
+.dot { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; }
+.dot-all { background: conic-gradient(#8d5a2b 0 17%, #e0a100 0 33%, #37474f 0 50%, #c58b4c 0 67%, #6d4c41 0 83%, #e65100 0); }
+
+/* Détail : autres espèces et sosies */
+.others { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
+.others button { display: flex; gap: 8px; align-items: center; width: 100%; text-align: left; font-size: 0.82rem;
+  padding: 4px 6px; border-color: transparent; }
+.others button.on { border-color: var(--accent); background: #e5f0e7; }
+.lookalikes { list-style: none; padding: 0; margin: 0; }
+.lookalikes li { display: flex; gap: 8px; align-items: flex-start; padding: 5px 0; border-bottom: 1px solid var(--line); font-size: 0.85rem; }
+.lookalikes small { display: block; color: var(--muted); font-size: 0.75rem; }
+.danger { flex-shrink: 0; font-size: 0.7rem; font-weight: 700; padding: 2px 6px; border-radius: 4px; color: #fff; text-transform: uppercase; }
+.danger-mortel { background: #7b1fa2; }
+.danger-toxique { background: var(--err); }
+.danger-faible { background: #8d8d8d; }
+.warn-box { background: #fdecea; border: 1px solid #f5c2c0; color: #8a1c14; border-radius: 6px; padding: 6px 8px; margin-bottom: 6px; }

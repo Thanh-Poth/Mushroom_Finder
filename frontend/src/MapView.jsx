@@ -19,14 +19,14 @@ const EMPTY = { type: 'FeatureCollection', features: [] }
 
 export const NO_DATA_COLOR = '#d9d9d9'
 
-export function scoreColorExpr(classes) {
+export function scoreColorExpr(classes, key) {
   const asc = [...classes].sort((a, b) => a.min - b.min)
-  const step = ['step', ['get', 'score'], asc[0].color]
+  const step = ['step', ['get', key], asc[0].color]
   asc.slice(1).forEach((c) => step.push(c.min, c.color))
-  return ['case', ['==', ['typeof', ['get', 'score']], 'number'], step, NO_DATA_COLOR]
+  return ['case', ['==', ['typeof', ['get', key]], 'number'], step, NO_DATA_COLOR]
 }
 
-export default function MapView({ initial, data, classes, filter, selected, onSelect, onMove,
+export default function MapView({ initial, data, classes, scoreKey, filter, selected, onSelect, onMove,
                                   flyTarget, userPos, basemap }) {
   const container = useRef(null)
   const mapRef = useRef(null)
@@ -96,8 +96,10 @@ export default function MapView({ initial, data, classes, filter, selected, onSe
   }, [data, ready])
 
   useEffect(() => {
-    if (ready && classes?.length) mapRef.current.setPaintProperty('zones-fill', 'fill-color', scoreColorExpr(classes))
-  }, [classes, ready])
+    if (ready && classes?.length) {
+      mapRef.current.setPaintProperty('zones-fill', 'fill-color', scoreColorExpr(classes, scoreKey))
+    }
+  }, [classes, scoreKey, ready])
 
   useEffect(() => {
     if (!ready) return

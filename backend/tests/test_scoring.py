@@ -22,10 +22,10 @@ def make_days(today: date, rain: list[float], tmean: float, tmin: float | None =
     return days
 
 
-def score_for(category, **kw):
+def score_for(category, species="cepe", **kw):
     today = kw.pop("today")
-    w = weather_score(make_days(today, **kw), today, CFG)
-    return total_score(essence_score(category, CFG)["score"], w["score"]), w
+    w = weather_score(make_days(today, **kw), today, CFG, species)
+    return total_score(essence_score(category, CFG, species)["score"], w["score"]), w
 
 
 def test_interp():
@@ -38,7 +38,7 @@ def test_interp():
 
 def test_all_tfv_codes_mapped_to_known_category():
     for code, entry in CFG["tfv"].items():
-        assert entry["category"] in CFG["essences"], code
+        assert entry["category"] in CFG["essence_categories"], code
     assert len(CFG["tfv"]) == 32
 
 
@@ -95,3 +95,56 @@ def test_air_temperature_fallback_and_incomplete_history():
     assert w["summary"]["temp_source"] == "air"
     assert weather_score([], today, CFG)["score"] is None
     assert total_score(1.0, None) is None
+
+
+# --- Espèces -----------------------------------------------------------------
+
+AUTUMN = dict(rain=[8, 12, 4, 0, 6, 5, 3], soil_m=0.32, lag_rain=25)
+
+
+def test_species_config_is_consistent():
+    assert len(CFG["species"]) >= 6
+    for sid, sp in CFG["species"].items():
+        assert set(sp["essences"]) <= set(CFG["essence_categories"]), sid
+        assert sorted(sp["season"]) == list(range(1, 13)), sid
+        assert all(0 <= v <= 1 for v in sp["essences"].values()), sid
+        assert sp["lookalikes"], sid
+
+
+def test_chanterelle_peaks_in_warm_wet_summer():
+    kw = dict(today=date(2026, 8, 20), tmean=17, soil_t=17, **AUTUMN)
+    girolle, _ = score_for("chene", "girolle", **kw)
+    cepe, _ = score_for("chene", "cepe", **kw)
+    assert girolle >= 80 and girolle > cepe
+
+
+def test_morel_spring_under_poplar_not_autumn():
+    spring, _ = score_for("peupleraie", "morille", today=date(2026, 4, 15),
+                          rain=[5, 0, 8, 4, 0, 6, 2], tmean=11, soil_t=11, soil_m=0.3)
+    autumn, _ = score_for("peupleraie", "morille", today=date(2026, 10, 15),
+                          rain=[5, 0, 8, 4, 0, 6, 2], tmean=11, soil_t=11, soil_m=0.3)
+    cepe_poplar, _ = score_for("peupleraie", "cepe", today=date(2026, 10, 15),
+                               rain=[5, 0, 8, 4, 0, 6, 2], tmean=11, soil_t=11, soil_m=0.3)
+    assert spring >= 70 and autumn < 10 and cepe_poplar == 0
+
+
+def test_black_trumpet_prefers_beech_over_pine():
+    kw = dict(today=date(2026, 10, 20), tmean=12, soil_t=12, rain=[10] * 7, soil_m=0.35)
+    beech, _ = score_for("hetre", "trompette", **kw)
+    pine, _ = score_for("pin", "trompette", **kw)
+    assert beech >= 80 and pine < 15
+
+
+def test_hedgehog_tolerates_cold_early_winter_better_than_porcini():
+    kw = dict(today=date(2026, 12, 5), tmean=5, tmin=-1, soil_t=6, rain=[5] * 7, soil_m=0.33)
+    hedgehog, w = score_for("hetre", "pied_de_mouton", **kw)
+    cepe, _ = score_for("hetre", "cepe", **kw)
+    assert hedgehog > 3 * cepe
+    assert next(f for f in w["factors"] if f["key"] == "season")["status"] == "ok"
+
+
+def test_saffron_milk_cap_only_under_pines():
+    kw = dict(today=date(2026, 10, 25), tmean=13, soil_t=13, **AUTUMN)
+    pine, _ = score_for("pin", "lactaire", **kw)
+    oak, _ = score_for("chene", "lactaire", **kw)
+    assert pine >= 80 and oak == 0
